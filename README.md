@@ -1,71 +1,90 @@
-<!-- # 🏦 Basic Bank -->
+# Boost.Compute #
 
-[//]: # (<img alt="workshop/basic_bank" width="1412" src="../.resources/basic_bank.png">)
+[![Build Status](https://travis-ci.org/boostorg/compute.svg?branch=master)](https://travis-ci.org/boostorg/compute)
+[![Build status](https://ci.appveyor.com/api/projects/status/4s2nvfc97m7w23oi/branch/master?svg=true)](https://ci.appveyor.com/project/jszuppe/compute/branch/master)
+[![Coverage Status](https://coveralls.io/repos/boostorg/compute/badge.svg?branch=master)](https://coveralls.io/r/boostorg/compute)
+[![Gitter](https://badges.gitter.im/boostorg/compute.svg)](https://gitter.im/boostorg/compute?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge)
 
-A simple-interest yielding bank account in Leo.
+Boost.Compute is a GPU/parallel-computing library for C++ based on OpenCL.
 
-## Summary
+The core library is a thin C++ wrapper over the OpenCL API and provides
+access to compute devices, contexts, command queues and memory buffers.
 
-This program implements a bank that issues tokens to users and allows users to deposit tokens to accrue simple interest on their deposits.
+On top of the core library is a generic, STL-like interface providing common
+algorithms (e.g. `transform()`, `accumulate()`, `sort()`) along with common
+containers (e.g. `vector<T>`, `flat_set<T>`). It also features a number of
+extensions including parallel-computing algorithms (e.g. `exclusive_scan()`,
+`scatter()`, `reduce()`) and a number of fancy iterators (e.g.
+`transform_iterator<>`, `permutation_iterator<>`, `zip_iterator<>`).
 
-### User Flow
-1. The bank issues users tokens via the `issue` function.
-2. A user deposits tokens via the `deposit` function.
-3. Upon a user's request to withdraw, the bank calculates the appropriate amount of compound interest and pays the user the principal and interest via the `withdraw` function.
+The full documentation is available at http://boostorg.github.io/compute/.
 
-Note that the program can be easily extended to include addition features such as a `transfer` function, which would allow users to transfer tokens to other users.
+## Example ##
 
-## Bugs
+The following example shows how to sort a vector of floats on the GPU:
 
-You may have already guessed that this program has a few bugs. We list some of them below: 
-- `withdraw` can only be invoked by the bank. A malicious bank could lock users' tokens by not invoking `withdraw`.
-- `withdraw` fails if the sum of the interest and principal is greater than the user's balance. 
-- User's can increase their principal by depositing tokens multiple times, including immediately before withdrawl.
-- Integer division rounds down; if the calculated interest is too small, then it will be rounded down to zero.
+```c++
+#include <vector>
+#include <algorithm>
+#include <boost/compute.hpp>
 
-Can you find any others?
+namespace compute = boost::compute;
 
-## Language Features and Concepts
-- `record` declarations
-- `assert_eq`
-- core functions, e.g. `BHP256::hash_to_field`
-- record ownership
-- loops and bounded iteration
-- mappings
-- finalize
+int main()
+{
+    // get the default compute device
+    compute::device gpu = compute::system::default_device();
 
-## Running the Program
+    // create a compute context and command queue
+    compute::context ctx(gpu);
+    compute::command_queue queue(ctx, gpu);
 
-Leo provides users with a command line interface for compiling and running Leo programs.
-Users may either specify input values via the command line or provide an input file in `inputs/`.
+    // generate random numbers on the host
+    std::vector<float> host_vector(1000000);
+    std::generate(host_vector.begin(), host_vector.end(), rand);
 
-### Configuring Accounts
-The `.env` file contains a private key.
-This is the account that will be used to sign transactions and is checked for record ownership.
-When executing programs as different parties, be sure to set the `PRIVATE_KEY` field in `.env` to the appropriate values.
-See `./run.sh` for an example of how to run the program as different parties.
+    // create vector on the device
+    compute::vector<float> device_vector(1000000, ctx);
 
+    // copy data to the device
+    compute::copy(
+        host_vector.begin(), host_vector.end(), device_vector.begin(), queue
+    );
 
-The [Aleo SDK](https://github.com/AleoHQ/leo/tree/testnet3) provides an interface for generating new accounts.
-To generate a new account, navigate to [aleo.tools](https://aleo.tools).
+    // sort data on the device
+    compute::sort(
+        device_vector.begin(), device_vector.end(), queue
+    );
 
-### Providing inputs via the command line.
-1. Run
-```bash
-leo run <function_name> <input_1> <input_2> ...
+    // copy data back to the host
+    compute::copy(
+        device_vector.begin(), device_vector.end(), host_vector.begin(), queue
+    );
+
+    return 0;
+}
 ```
-See `./run.sh` for an example.
 
+Boost.Compute is a header-only library, so no linking is required. The example
+above can be compiled with:
 
-### Using an input file.
-1. Modify `inputs/auction.in` with the desired inputs.
-2. Run
-```bash
-leo run <function_name>
-```
-For example,
-```bash
-leo run issue
-leo run deposit
-leo run withdraw
-```
+`g++ -I/path/to/compute/include sort.cpp -lOpenCL`
+
+More examples can be found in the [tutorial](
+http://boostorg.github.io/compute/boost_compute/tutorial.html) and under the
+[examples](https://github.com/boostorg/compute/tree/master/example) directory.
+
+## Support ##
+Questions about the library (both usage and development) can be posted to the
+[mailing list](https://groups.google.com/forum/#!forum/boost-compute).
+
+Bugs and feature requests can be reported through the [issue tracker](
+https://github.com/boostorg/compute/issues?state=open).
+
+Also feel free to send me an email with any problems, questions, or feedback.
+
+## Help Wanted ##
+The Boost.Compute project is currently looking for additional developers with
+interest in parallel computing.
+
+Please send an email to Kyle Lutz (kyle.r.lutz@gmail.com) for more information.
